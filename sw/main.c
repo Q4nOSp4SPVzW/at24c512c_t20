@@ -25,6 +25,12 @@
 #define EEPROM_PAGE_SIZE   128u
 #define EEPROM_WRITE_DELAY_MS  5u
 
+// 不揮発性保持テスト用アドレス・マジック
+#define NVM_TEST_ADDR      0xFFF0u
+#define NVM_TEST_MAGIC     0xA5u
+#define NVM_TEST_COUNT_OFF 1u   // 電源サイクルカウンタのオフセット
+#define NVM_TEST_TS_OFF    2u   // タイムスタンプのオフセット (2バイト)
+
 #define CPU_BLINK_PERIOD        1000000u
 #define WDT_PAT_PERIOD          100000u
 #define WDT_PRESCALER_PER_MS    (SYSTEM_CLINT_HZ / 1000u)
