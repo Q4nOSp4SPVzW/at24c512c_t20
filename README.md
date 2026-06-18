@@ -105,6 +105,34 @@ Efinity Sapphire SoC IP (v3.4.0) を使用。Efinity IP Manager で生成した 
 - LED[7] はFabric回路で独立点滅 (CPUクラッシュ時も継続)
 - AXI Master はRTLでダミー応答 (FPGA内未接続の周辺アクセス用)
 
+### LED の動作
+
+ユーザーLED 8個は3つの源に分かれています:
+
+| LED | 駆動元 | 動作 |
+|-----|--------|------|
+| LED0 | CPU ファームウェア | メインループ内で約0.5秒周期でトグル (CPU生存確認用) |
+| LED1〜6 | CPU ファームウェア | UARTコマンド `1`〜`6` / `a` / `c` で制御 |
+| LED7 | FPGA Fabric (ハードウェア) | 27bitカウンタで約1.5Hz点滅 (CPUクラッシュ時も継続) |
+
+RTL での接続:
+
+```verilog
+assign led_o = {~blink_cnt[25], ~gpio_write[6:0]};
+//              ↑LED7=HW点滅     ↑LED6:0=CPU GPIO出力
+```
+
+ファームウェアでのLED0点滅:
+
+```c
+if (cpu_blink_cnt >= CPU_BLINK_PERIOD) {
+    led ^= 0x01u;   // LED0 トグル
+    led_write();
+}
+```
+
+**ハング判別**: LED7が点滅しているのにLED0が止まっている場合、CPUがクラッシュまたはハングアップしています。
+
 ## ボード配線
 
 | 信号 | ピン | GPIO | 説明 |
