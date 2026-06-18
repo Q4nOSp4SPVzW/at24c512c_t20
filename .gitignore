@@ -1,0 +1,33 @@
+# Efinity generated outputs
+/outflow/
+/work_pnr/
+/work_pt/
+/work_syn/
+/work_dbg/
+/ooc/
+/embedded_sw/soc/.metadata/
+/embedded_sw/soc/bsp/efinix/EfxSapphireSoc/app/
+/embedded_sw/soc/tool/
+/embedded_sw/soc/ideconfig.properties
+/embedded_sw/soc/cpu0.yaml
+/ip/soc/Testbench/
+/ip/soc/*_devkit/
+/ip/soc/T120F324_devkit/
+/ip/soc/Ti60F225_devkit/
+/ip/soc/Tz170J484_devkit/
+/ip/soc/T20F256_devkit/
+/ip/soc/ipm/
+/ip/soc_core/
+*.log
+.lock
+
+# Firmware build outputs
+/sw/build/
+/*.bin
+/ip/**/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin
+
+# Local/editor files
+.vscode/
+.idea/
+*.swp
+Thumbs.db
