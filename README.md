@@ -41,7 +41,7 @@ Efinity Sapphire SoC IP (v3.4.0) を使用。Efinity IP Manager で生成した 
 
 | 種別 | ベースアドレス | サイズ | 備考 |
 |------|---------------|--------|------|
-| 内蔵RAM (RAM_A) | `0xF9000000` | 8KB | ファームウェア + スタック |
+| 内蔵RAM (RAM_A) | `0xF9000000` | 16KB | ファームウェア + スタック |
 | AXI Slave | `0x01000000` | 16MB | RTLでダミー応答 (未使用) |
 | ペリフェラル空間 | `0xF8000000` | 16MB | 下記ペリフェラルを配置 |
 | CLINT | `0xF8B00000` | 64KB | タイマ・割り込み |
@@ -173,7 +173,7 @@ SoC全体で6,308LE中、大部分がCPUコアとペリフェラルで消費:
 | CPU コア (VexRiscv派生) | RV32IM パイプライン、レジスタファイル、割込処理 | LE多数 + RAM 4ブロック (レジスタファイル) |
 | I-Cache | 4KB / 1way / 64B per line | RAM 8ブロック (タグ+データ) |
 | D-Cache | 4KB / 1way / 64B per line | RAM 10ブロック (タグ+データ) |
-| 内蔵RAM (RAM_A) | 8KB ファームウェア格納 | RAM 16ブロック |
+| 内蔵RAM (RAM_A) | 16KB ファームウェア格納 | RAM 32ブロック |
 | UART0 | TX/RX FIFO 各128 | RAM 2ブロック |
 | SPI0 | Cmd/Rsp FIFO 各256 | RAM 2ブロック |
 | I2C0 | I2Cコントローラ | LE少量 |
@@ -191,17 +191,17 @@ Trion T20 のメモリブロックは1個あたり 4,096 bits (512 bytes)。全4
 
 | 用途 | ブロック数 | バイト数 | ビット数 | 備考 |
 |------|:---------:|:--------:|:--------:|------|
-| 内蔵RAM (RAM_A) | 16 | 8,192 | 65,536 | ファームウェア + スタック (8KB) |
+| 内蔵RAM (RAM_A) | 32 | 16,384 | 131,072 | ファームウェア + スタック (16KB) |
 | D-Cache データ/タグ | 10 | 5,120 | 40,960 | 4KB データ + タグ (1way) |
 | I-Cache データ/タグ | 9 | 4,608 | 36,864 | 4KB データ + タグ (1way) |
 | レジスタファイル | 4 | 2,048 | 16,384 | 32本 × 32bit (2ポート) |
 | SPI0 FIFO | 2 | 1,024 | 8,192 | Cmd/Rsp 各256エントリ |
 | UART0 FIFO | 2 | 1,024 | 8,192 | TX/RX 各128エントリ |
-| **合計** | **43** | **22,016** | **176,128** | T20F256 全204ブロック中 21.08% |
+| **合計** | **59** | **30,208** | **241,664** | T20F256 全204ブロック中 28.92% |
 
-> - **ファームウェア領域**: RAM_A 8KBのうち、ファームウェア本体約5〜6KB + スタック512bytes (`linker.ld` で `__stack_size = 512`)
+> - **ファームウェア領域**: RAM_A 16KBのうち、ファームウェア本体約10KB + スタック512bytes (`linker.ld` で `__stack_size = 512`)
 > - **I2C0/GPIO0/WDT**: RAMブロック未使用 (LEのみで実装)
-> - **残り161ブロック** (約80KB) をユーザー回路のBRAMに使用可能
+> - **残り145ブロック** (約72KB) をユーザー回路のBRAMに使用可能
 
 ## ボード配線
 
@@ -372,6 +372,70 @@ Verifying...
 Full test PASS
 ```
 
+#### `nvm` — 不揮発性保持テスト
+
+電源を切ってもデータが残るか (EEPROMの本来機能) を確認するテストです。EEPROM末尾 (0xFFF0〜) にマジック・カウンタ・チェックサムを書き込み、電源サイクル後の保持を検証します。
+
+| サブコマンド | 内容 |
+|--------------|------|
+| `nvm save` | 初期パターン書き込み (magic=0xA5, counter=0) |
+| `nvm load` | 読み出して magic・counter・checksum を表示・検証 |
+| `nvm inc` | counter を +1 して保存 |
+| `nvm clear` | テスト領域を 0x00 でクリア |
+
+EEPROM のレイアウト (4バイト):
+
+```
+0xFFF0: Magic    (0xA5)
+0xFFF1: Counter  (16bit, big-endian)
+0xFFF3: Checksum (Magic ^ Counter)
+```
+
+**テスト手順:**
+
+```
+ステップ1: 初期書き込み
+> nvm save
+Saving NVM pattern...
+OK
+Power off the board, then power on and run 'nvm load'.
+
+ステップ2: 電源OFF → 電源ON
+
+ステップ3: 保持確認
+> nvm load
+Loading NVM pattern...
+  Magic    = 0xA5
+  Counter  = 0x0
+  Checksum = 0xA5
+  Status   = OK
+Retention OK.
+
+ステップ4: カウンタを増やす
+> nvm inc
+Loading NVM pattern...
+  Magic    = 0xA5
+  Counter  = 0x0
+  Checksum = 0xA5
+  Status   = OK
+Incrementing and saving...
+New counter = 0x1
+Power off, power on, and run 'nvm load' to verify.
+
+ステップ5: 電源OFF → 電源ON
+
+ステップ6: カウンタが保持されているか確認
+> nvm load
+Loading NVM pattern...
+  Magic    = 0xA5
+  Counter  = 0x1
+  Checksum = 0xA4
+  Status   = OK
+Retention OK.
+```
+
+`Status = OK` になれば、電源サイクル後もデータが正しく保持されています。`INVALID` (magic不一致) または `CORRUPT` (checksum不一致) の場合はデータ破損を示します。
+
 #### `scan` — I2C バススキャン
 
 アドレス 0x03〜0x77 を走査し、ACKを返すデバイスを一覧します。AT24C512C は通常 0x50 に応答します。
@@ -524,6 +588,7 @@ eedump <addr16> <len> dump (max 64)
 eefill <addr16> <len> <data> fill (max 128)
 eetest                test pattern
 memtest [quick|page <a>|range <a> <l>|full]
+nvm save|load|inc|clear   retention test
 scan                  I2C bus scan
 iinit                 reinit I2C
 === LED/GPIO ===
@@ -616,6 +681,11 @@ OK
 00002000: 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55
 00002010: 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55 55
 
+> nvm save
+Saving NVM pattern...
+OK
+Power off the board, then power on and run 'nvm load'.
+
 > id
 ID INFO
 FW      = v1.0.0 AT24C512C
@@ -659,3 +729,13 @@ I2CINIT = 0x1
 .\build.ps1      # Efinity FPGAビルド（合成・配置配線）
 .\program.ps1    # FPGAへ書き込み
 ```
+
+> **重要: SoC IP の再生成が必要**
+>
+> 内蔵RAMを8KB→16KBに変更しているため、初回ビルド前にEfinity IDEでSapphire SoC IPを再生成する必要があります:
+> 1. Efinity IDEでプロジェクトを開く
+> 2. IP Manager で `soc` IPを開く
+> 3. `OCRSize` が `16384` になっていることを確認 (settings.jsonは更新済み)
+> 4. 「Generate」ボタンでIPを再生成
+> 5. `ip/soc/soc.v` と `embedded_sw/` が自動更新される
+> 6. その後 `build_sw.ps1` → `build.ps1` → `program.ps1` の順に実行

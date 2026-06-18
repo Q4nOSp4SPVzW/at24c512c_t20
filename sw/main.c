@@ -324,8 +324,8 @@ static void eeprom_memtest_quick(void)
 // ページテスト: 128バイト範囲でパターン検証
 static void eeprom_memtest_page(u16 addr)
 {
-    u8 wbuf[EEPROM_PAGE_SIZE];
-    u8 rbuf[EEPROM_PAGE_SIZE];
+    static u8 wbuf[EEPROM_PAGE_SIZE];
+    static u8 rbuf[EEPROM_PAGE_SIZE];
     u16 page_base = (u16)(addr & 0xFF80u);
 
     uart_writeStr(UART_REG, "Page test: 128 bytes at 0x");
@@ -363,12 +363,66 @@ static void eeprom_memtest_page(u16 addr)
     }
 }
 
+// フルテスト: 全64KB を3パターンでページ書き込み検証
+static void eeprom_memtest_full(void)
+{
+    static u8 wbuf[EEPROM_PAGE_SIZE];
+    static u8 rbuf[EEPROM_PAGE_SIZE];
+    const u32 total_pages = 0x10000u / EEPROM_PAGE_SIZE;
+
+    uart_writeStr(UART_REG, "Full test: 64KB x 3 patterns (page write)...\r\n");
+    uart_writeStr(UART_REG, "WARNING: ~3000 write cycles. Do not run frequently.\r\n");
+
+    u8 ok = 1u;
+    for (u32 pat = 0u; pat < MEMTEST_PATTERNS_COUNT - 1u; pat++) {
+        u8 w = memtest_patterns[pat];
+        uart_writeStr(UART_REG, "\r\nPattern 0x");
+        uart_writeHex(UART_REG, (int)w);
+        uart_writeStr(UART_REG, ": writing...\r\n");
+
+        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) wbuf[i] = w;
+        for (u32 pg = 0u; pg < total_pages; pg++) {
+            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
+            eeprom_write_page(base, wbuf, EEPROM_PAGE_SIZE);
+            if ((pg & 0x3Fu) == 0u) uart_putc('.');
+        }
+        uart_writeStr(UART_REG, "\r\nVerifying...\r\n");
+
+        for (u32 pg = 0u; pg < total_pages; pg++) {
+            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
+            eeprom_read_bytes(base, rbuf, EEPROM_PAGE_SIZE);
+            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
+                if (rbuf[i] != w) {
+                    uart_writeStr(UART_REG, "  FAIL @0x");
+                    uart_writeHex(UART_REG, (int)(base + i));
+                    uart_writeStr(UART_REG, " exp 0x");
+                    uart_writeHex(UART_REG, (int)w);
+                    uart_writeStr(UART_REG, " got 0x");
+                    uart_writeHex(UART_REG, (int)rbuf[i]);
+                    uart_writeStr(UART_REG, "\r\n");
+                    ok = 0u;
+                }
+            }
+            if ((pg & 0x3Fu) == 0u) uart_putc('.');
+        }
+        uart_writeStr(UART_REG, "\r\n");
+    }
+    if (ok) {
+        uart_writeStr(UART_REG, "Full test PASS\r\n");
+        last_error = ERR_NONE;
+    } else {
+        uart_writeStr(UART_REG, "Full test FAIL\r\n");
+        last_error = ERR_I2C_NACK;
+    }
+}
+
 // 範囲テスト: 指定範囲でアドレス依存パターン検証
 static void eeprom_memtest_range(u16 addr, u32 len)
 {
     if (len > 1024u) len = 1024u;
     if ((u32)addr + len > 0x10000u) {
-        print_err(ERR_RANGE);
+        uart_writeStr(UART_REG, "ERR 6\r\n");
+        last_error = ERR_RANGE;
         return;
     }
 
@@ -418,58 +472,108 @@ static void eeprom_memtest_range(u16 addr, u32 len)
     }
 }
 
-// フルテスト: 全64KB を3パターンでページ書き込み検証
-static void eeprom_memtest_full(void)
+// -----------------------------------------------------------------------------
+// 不揮発性保持テスト (NVM retention test)
+// -----------------------------------------------------------------------------
+// EEPROM の最終アドレス付近 (0xFFF0〜) を使用:
+//   [0xFFF0] Magic    (0xA5)  - テスト領域の有効性確認
+//   [0xFFF1] Counter  (16bit, big-endian) - 電源サイクルカウンタ
+//   [0xFFF3] Checksum (XOR)    - データ保全性
+//
+// 使い方:
+//   1. nvm save       → 初期パターン書き込み (magic=0xA5, count=0)
+//   2. 電源OFF → ON
+//   3. nvm load       → magic と count=0 を確認 (保持OK)
+//   4. nvm inc        → count をインクリメントして保存
+//   5. 電源OFF → ON
+//   6. nvm load       → count が増えていることを確認
+// -----------------------------------------------------------------------------
+
+static u8 nvm_calc_checksum(u8 magic, u16 count)
 {
-    u8 wbuf[EEPROM_PAGE_SIZE];
-    u8 rbuf[EEPROM_PAGE_SIZE];
-    const u32 total_pages = 0x10000u / EEPROM_PAGE_SIZE;
+    return (u8)(magic ^ (u8)(count >> 8) ^ (u8)(count & 0xFF));
+}
 
-    uart_writeStr(UART_REG, "Full test: 64KB x 3 patterns (page write)...\r\n");
-    uart_writeStr(UART_REG, "WARNING: ~3000 write cycles. Do not run frequently.\r\n");
+static void nvm_save(u16 count)
+{
+    eeprom_write_byte(NVM_TEST_ADDR,                   NVM_TEST_MAGIC);
+    eeprom_write_byte((u16)(NVM_TEST_ADDR + 1), (u8)(count >> 8));
+    eeprom_write_byte((u16)(NVM_TEST_ADDR + 2), (u8)(count & 0xFF));
+    eeprom_write_byte((u16)(NVM_TEST_ADDR + 3), nvm_calc_checksum(NVM_TEST_MAGIC, count));
+}
 
-    u8 ok = 1u;
-    for (u32 pat = 0u; pat < MEMTEST_PATTERNS_COUNT - 1u; pat++) {
-        u8 w = memtest_patterns[pat];
-        uart_writeStr(UART_REG, "\r\nPattern 0x");
-        uart_writeHex(UART_REG, (int)w);
-        uart_writeStr(UART_REG, ": writing...\r\n");
+static u8 nvm_load(u16 *count)
+{
+    u8 magic = 0u, hi = 0u, lo = 0u, cksum = 0u;
+    eeprom_read_byte(NVM_TEST_ADDR,                   &magic);
+    eeprom_read_byte((u16)(NVM_TEST_ADDR + 1), &hi);
+    eeprom_read_byte((u16)(NVM_TEST_ADDR + 2), &lo);
+    eeprom_read_byte((u16)(NVM_TEST_ADDR + 3), &cksum);
 
-        for (u32 pg = 0u; pg < total_pages; pg++) {
-            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
-            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++)
-                wbuf[i] = w;
-            eeprom_write_page(base, wbuf, EEPROM_PAGE_SIZE);
-            if ((pg & 0x3Fu) == 0u) uart_putc('.');
-        }
-        uart_writeStr(UART_REG, "\r\nVerifying...\r\n");
+    uart_put_label_hex("  Magic    = ", (u32)magic);
+    uart_put_label_hex("  Counter  = ", (u32)(((u16)hi << 8) | lo));
+    uart_put_label_hex("  Checksum = ", (u32)cksum);
 
-        for (u32 pg = 0u; pg < total_pages; pg++) {
-            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
-            eeprom_read_bytes(base, rbuf, EEPROM_PAGE_SIZE);
-            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
-                if (rbuf[i] != w) {
-                    uart_writeStr(UART_REG, "  FAIL @0x");
-                    uart_writeHex(UART_REG, (int)(base + i));
-                    uart_writeStr(UART_REG, " exp 0x");
-                    uart_writeHex(UART_REG, (int)w);
-                    uart_writeStr(UART_REG, " got 0x");
-                    uart_writeHex(UART_REG, (int)rbuf[i]);
-                    uart_writeStr(UART_REG, "\r\n");
-                    ok = 0u;
-                }
-            }
-            if ((pg & 0x3Fu) == 0u) uart_putc('.');
-        }
-        uart_writeStr(UART_REG, "\r\n");
+    if (magic != NVM_TEST_MAGIC) {
+        uart_writeStr(UART_REG, "  Status   = INVALID (magic mismatch)\r\n");
+        if (count) *count = 0u;
+        return 0u;
     }
-    if (ok) {
-        uart_writeStr(UART_REG, "Full test PASS\r\n");
+    u16 c = (u16)(((u16)hi << 8) | lo);
+    u8 expected = nvm_calc_checksum(magic, c);
+    if (cksum != expected) {
+        uart_writeStr(UART_REG, "  Status   = CORRUPT (checksum mismatch)\r\n");
+        if (count) *count = c;
+        return 0u;
+    }
+    uart_writeStr(UART_REG, "  Status   = OK\r\n");
+    if (count) *count = c;
+    return 1u;
+}
+
+static void nvm_clear(void)
+{
+    for (u32 i = 0u; i < 4u; i++)
+        eeprom_write_byte((u16)(NVM_TEST_ADDR + i), 0x00u);
+    uart_writeStr(UART_REG, "NVM test area cleared.\r\n");
+    last_error = ERR_NONE;
+}
+
+static void nvm_cmd_save(void)
+{
+    uart_writeStr(UART_REG, "Saving NVM pattern...\r\n");
+    nvm_save(0u);
+    uart_writeStr(UART_REG, "OK\r\n");
+    uart_writeStr(UART_REG, "Power off the board, then power on and run 'nvm load'.\r\n");
+    last_error = ERR_NONE;
+}
+
+static void nvm_cmd_load(void)
+{
+    uart_writeStr(UART_REG, "Loading NVM pattern...\r\n");
+    u16 count = 0u;
+    if (nvm_load(&count)) {
+        uart_writeStr(UART_REG, "Retention OK.\r\n");
         last_error = ERR_NONE;
     } else {
-        uart_writeStr(UART_REG, "Full test FAIL\r\n");
         last_error = ERR_I2C_NACK;
     }
+}
+
+static void nvm_cmd_inc(void)
+{
+    u16 count = 0u;
+    if (!nvm_load(&count)) {
+        uart_writeStr(UART_REG, "Run 'nvm save' first.\r\n");
+        last_error = ERR_I2C_NACK;
+        return;
+    }
+    count++;
+    uart_writeStr(UART_REG, "Incrementing and saving...\r\n");
+    nvm_save(count);
+    uart_put_label_hex("New counter = ", (u32)count);
+    uart_writeStr(UART_REG, "Power off, power on, and run 'nvm load' to verify.\r\n");
+    last_error = ERR_NONE;
 }
 
 // -----------------------------------------------------------------------------
@@ -646,6 +750,7 @@ static void help(void)
     uart_writeStr(UART_REG, "eefill <addr16> <len> <data> fill (max 128)\r\n");
     uart_writeStr(UART_REG, "eetest                test pattern\r\n");
     uart_writeStr(UART_REG, "memtest [quick|page <a>|range <a> <l>|full]\r\n");
+    uart_writeStr(UART_REG, "nvm save|load|inc|clear   retention test\r\n");
     uart_writeStr(UART_REG, "scan                  I2C bus scan\r\n");
     uart_writeStr(UART_REG, "iinit                 reinit I2C\r\n");
     uart_writeStr(UART_REG, "=== LED/GPIO ===\r\n");
@@ -831,6 +936,27 @@ static void execute_line(char *line)
         }
         if (token_eq(p, "full")) {
             eeprom_memtest_full();
+            return;
+        }
+        print_err(ERR_BAD_ARG);
+        return;
+    }
+    if (token_eq(p, "nvm")) {
+        p = skip_spaces(p + 3);
+        if (token_eq(p, "save")) {
+            nvm_cmd_save();
+            return;
+        }
+        if (token_eq(p, "load")) {
+            nvm_cmd_load();
+            return;
+        }
+        if (token_eq(p, "inc")) {
+            nvm_cmd_inc();
+            return;
+        }
+        if (token_eq(p, "clear")) {
+            nvm_clear();
             return;
         }
         print_err(ERR_BAD_ARG);

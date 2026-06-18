@@ -63,7 +63,7 @@ $Python3Bat = "C:\Efinity\2026.1\bin\python3.bat"
 
 Push-Location $BuildDir
 try {
-    & $Python3Bat $BinGen -b at24c512c.bin -f 0 -s 8192
+    & $Python3Bat $BinGen -b at24c512c.bin -f 0 -s 16384
 }
 finally {
     Pop-Location
