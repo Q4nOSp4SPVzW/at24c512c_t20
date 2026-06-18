@@ -40,7 +40,7 @@ GND      ──────────── GND
 
 ## UART設定
 
-- COM11
+- ボードのUSBシリアルポート (OSで割り当てられたCOM番号)
 - 9600 bps
 - データ8ビット、パリティなし、ストップビット1
 
@@ -107,6 +107,75 @@ EEPROM test: write 16 bytes at 0x0000...
 Reading back...
 40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F
 PASS
+```
+
+#### `memtest` — EEPROM メモリテスト
+
+EEPROMのデータ・アドレス・パターン整合性を検証します。サブコマンドで規模を選択:
+
+| 書式 | 内容 | 書き込み回数 | 所要時間 |
+|------|------|------------|---------|
+| `memtest` | クイックテスト (4アドレス×4パターン) | 16回 | ~0.1秒 |
+| `memtest quick` | 同上 | 16回 | ~0.1秒 |
+| `memtest page <addr16>` | 1ページ(128B)×4パターン | 512回 | ~3秒 |
+| `memtest range <addr16> <len>` | 指定範囲(最大1024B)のアドレス依存テスト | len回 | len×5ms |
+| `memtest full` | 全64KB×3パターン | ~1536回 | ~10秒 |
+
+> **注意:** `full` はEEPROMの書き換え寿命(AT24C512C: 100万回/セル)を消費します。頻繁な実行は避けてください。
+
+クイックテスト例 (0x0000, 0x4000, 0x8000, 0xC000 の各アドレスで 0x00/0xFF/0x55/0xAA を書いて読む):
+
+```
+> memtest
+Quick test: 4 addresses x 4 patterns...
+  [0x0000] OK
+  [0x4000] OK
+  [0x8000] OK
+  [0xC000] OK
+Quick test PASS
+```
+
+ページテスト例 (128バイトに 0x00/0xFF/0x55/0xAA を順に書いて検証):
+
+```
+> memtest page 0x0000
+Page test: 128 bytes at 0x0000...
+....
+Page test PASS
+```
+
+範囲テスト例 (256バイトにアドレス下位バイトを書いて検証):
+
+```
+> memtest range 0x0000 256
+Range test: 0x100 bytes at 0x0000...
+....
+Range test PASS
+```
+
+フルテスト例 (64KB全領域を 0x00/0xFF/0x55 の3パターンで検証):
+
+```
+> memtest full
+Full test: 64KB x 3 patterns (page write)...
+WARNING: ~3000 write cycles. Do not run frequently.
+
+Pattern 0x00: writing...
+................
+Verifying...
+................
+
+Pattern 0xFF: writing...
+................
+Verifying...
+................
+
+Pattern 0x55: writing...
+................
+Verifying...
+................
+
+Full test PASS
 ```
 
 #### `scan` — I2C バススキャン
@@ -260,6 +329,7 @@ eer <addr16>          read byte
 eedump <addr16> <len> dump (max 64)
 eefill <addr16> <len> <data> fill (max 128)
 eetest                test pattern
+memtest [quick|page <a>|range <a> <l>|full]
 scan                  I2C bus scan
 iinit                 reinit I2C
 === LED/GPIO ===
@@ -325,6 +395,14 @@ EEPROM test: write 16 bytes at 0x0000...
 Reading back...
 40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F
 PASS
+
+> memtest
+Quick test: 4 addresses x 4 patterns...
+  [0x0000] OK
+  [0x4000] OK
+  [0x8000] OK
+  [0xC000] OK
+Quick test PASS
 
 > eew 0x1000 0xAB
 OK

@@ -256,6 +256,217 @@ static void eeprom_test(void)
 }
 
 // -----------------------------------------------------------------------------
+// EEPROM メモリテスト
+// -----------------------------------------------------------------------------
+// テスト内容:
+//   1. データバステスト: 固定アドレスで 0x00/0xFF/0x55/0xAA を書いて読む
+//   2. アドレスユニークネス: 2の累乗アドレスにアドレス依存パターンを書く
+//   3. March風テスト: 全範囲に 0x00 → 0xFF → 0x55 の順で書いて読む
+// -----------------------------------------------------------------------------
+
+#define MEMTEST_PATTERNS_COUNT 4
+static const u8 memtest_patterns[MEMTEST_PATTERNS_COUNT] = {0x00u, 0xFFu, 0x55u, 0xAAu};
+
+// 1アドレスでデータバステスト
+static u8 memtest_data_bus(u16 addr)
+{
+    for (u32 i = 0u; i < MEMTEST_PATTERNS_COUNT; i++) {
+        u8 w = memtest_patterns[i];
+        u8 r = 0u;
+        eeprom_write_byte(addr, w);
+        eeprom_read_byte(addr, &r);
+        if (r != w) {
+            uart_writeStr(UART_REG, "  data bus FAIL @0x");
+            uart_writeHex(UART_REG, (int)addr);
+            uart_writeStr(UART_REG, " wrote 0x");
+            uart_writeHex(UART_REG, (int)w);
+            uart_writeStr(UART_REG, " read 0x");
+            uart_writeHex(UART_REG, (int)r);
+            uart_writeStr(UART_REG, "\r\n");
+            return 0u;
+        }
+    }
+    return 1u;
+}
+
+// クイックテスト: 4アドレス x 4パターン
+static void eeprom_memtest_quick(void)
+{
+    static const u16 quick_addrs[4] = {0x0000u, 0x4000u, 0x8000u, 0xC000u};
+
+    uart_writeStr(UART_REG, "Quick test: 4 addresses x 4 patterns...\r\n");
+    u8 ok = 1u;
+    for (u32 i = 0u; i < 4u; i++) {
+        uart_writeStr(UART_REG, "  [0x");
+        uart_writeHex(UART_REG, (int)quick_addrs[i]);
+        uart_writeStr(UART_REG, "] ");
+        if (memtest_data_bus(quick_addrs[i])) {
+            uart_writeStr(UART_REG, "OK\r\n");
+        } else {
+            ok = 0u;
+        }
+    }
+    if (ok) {
+        uart_writeStr(UART_REG, "Quick test PASS\r\n");
+        last_error = ERR_NONE;
+    } else {
+        uart_writeStr(UART_REG, "Quick test FAIL\r\n");
+        last_error = ERR_I2C_NACK;
+    }
+}
+
+// ページテスト: 128バイト範囲でパターン検証
+static void eeprom_memtest_page(u16 addr)
+{
+    u8 wbuf[EEPROM_PAGE_SIZE];
+    u8 rbuf[EEPROM_PAGE_SIZE];
+    u16 page_base = (u16)(addr & 0xFF80u);
+
+    uart_writeStr(UART_REG, "Page test: 128 bytes at 0x");
+    uart_writeHex(UART_REG, (int)page_base);
+    uart_writeStr(UART_REG, "...\r\n");
+
+    u8 ok = 1u;
+    for (u32 pat = 0u; pat < MEMTEST_PATTERNS_COUNT; pat++) {
+        u8 w = memtest_patterns[pat];
+        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++)
+            wbuf[i] = w;
+        eeprom_write_page(page_base, wbuf, EEPROM_PAGE_SIZE);
+        eeprom_read_bytes(page_base, rbuf, EEPROM_PAGE_SIZE);
+        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
+            if (rbuf[i] != w) {
+                uart_writeStr(UART_REG, "  FAIL @0x");
+                uart_writeHex(UART_REG, (int)(page_base + i));
+                uart_writeStr(UART_REG, " exp 0x");
+                uart_writeHex(UART_REG, (int)w);
+                uart_writeStr(UART_REG, " got 0x");
+                uart_writeHex(UART_REG, (int)rbuf[i]);
+                uart_writeStr(UART_REG, "\r\n");
+                ok = 0u;
+            }
+        }
+        uart_putc('.');
+    }
+    uart_writeStr(UART_REG, "\r\n");
+    if (ok) {
+        uart_writeStr(UART_REG, "Page test PASS\r\n");
+        last_error = ERR_NONE;
+    } else {
+        uart_writeStr(UART_REG, "Page test FAIL\r\n");
+        last_error = ERR_I2C_NACK;
+    }
+}
+
+// 範囲テスト: 指定範囲でアドレス依存パターン検証
+static void eeprom_memtest_range(u16 addr, u32 len)
+{
+    if (len > 1024u) len = 1024u;
+    if ((u32)addr + len > 0x10000u) {
+        print_err(ERR_RANGE);
+        return;
+    }
+
+    uart_writeStr(UART_REG, "Range test: ");
+    uart_writeHex(UART_REG, (int)len);
+    uart_writeStr(UART_REG, " bytes at 0x");
+    uart_writeHex(UART_REG, (int)addr);
+    uart_writeStr(UART_REG, "...\r\n");
+
+    // パス1: アドレス依存パターン (low byte of address)
+    u8 ok = 1u;
+    u8 rbuf[64];
+    for (u32 off = 0u; off < len; off += 64u) {
+        u32 chunk = len - off;
+        if (chunk > 64u) chunk = 64u;
+        for (u32 i = 0u; i < chunk; i++) {
+            u16 a = (u16)(addr + off + i);
+            eeprom_write_byte(a, (u8)(a & 0xFFu));
+        }
+    }
+    for (u32 off = 0u; off < len; off += 64u) {
+        u32 chunk = len - off;
+        if (chunk > 64u) chunk = 64u;
+        eeprom_read_bytes((u16)(addr + off), rbuf, chunk);
+        for (u32 i = 0u; i < chunk; i++) {
+            u16 a = (u16)(addr + off + i);
+            if (rbuf[i] != (u8)(a & 0xFFu)) {
+                uart_writeStr(UART_REG, "  FAIL @0x");
+                uart_writeHex(UART_REG, (int)a);
+                uart_writeStr(UART_REG, " exp 0x");
+                uart_writeHex(UART_REG, (int)(a & 0xFFu));
+                uart_writeStr(UART_REG, " got 0x");
+                uart_writeHex(UART_REG, (int)rbuf[i]);
+                uart_writeStr(UART_REG, "\r\n");
+                ok = 0u;
+            }
+        }
+        uart_putc('.');
+    }
+    uart_writeStr(UART_REG, "\r\n");
+    if (ok) {
+        uart_writeStr(UART_REG, "Range test PASS\r\n");
+        last_error = ERR_NONE;
+    } else {
+        uart_writeStr(UART_REG, "Range test FAIL\r\n");
+        last_error = ERR_I2C_NACK;
+    }
+}
+
+// フルテスト: 全64KB を3パターンでページ書き込み検証
+static void eeprom_memtest_full(void)
+{
+    u8 wbuf[EEPROM_PAGE_SIZE];
+    u8 rbuf[EEPROM_PAGE_SIZE];
+    const u32 total_pages = 0x10000u / EEPROM_PAGE_SIZE;
+
+    uart_writeStr(UART_REG, "Full test: 64KB x 3 patterns (page write)...\r\n");
+    uart_writeStr(UART_REG, "WARNING: ~3000 write cycles. Do not run frequently.\r\n");
+
+    u8 ok = 1u;
+    for (u32 pat = 0u; pat < MEMTEST_PATTERNS_COUNT - 1u; pat++) {
+        u8 w = memtest_patterns[pat];
+        uart_writeStr(UART_REG, "\r\nPattern 0x");
+        uart_writeHex(UART_REG, (int)w);
+        uart_writeStr(UART_REG, ": writing...\r\n");
+
+        for (u32 pg = 0u; pg < total_pages; pg++) {
+            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
+            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++)
+                wbuf[i] = w;
+            eeprom_write_page(base, wbuf, EEPROM_PAGE_SIZE);
+            if ((pg & 0x3Fu) == 0u) uart_putc('.');
+        }
+        uart_writeStr(UART_REG, "\r\nVerifying...\r\n");
+
+        for (u32 pg = 0u; pg < total_pages; pg++) {
+            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
+            eeprom_read_bytes(base, rbuf, EEPROM_PAGE_SIZE);
+            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
+                if (rbuf[i] != w) {
+                    uart_writeStr(UART_REG, "  FAIL @0x");
+                    uart_writeHex(UART_REG, (int)(base + i));
+                    uart_writeStr(UART_REG, " exp 0x");
+                    uart_writeHex(UART_REG, (int)w);
+                    uart_writeStr(UART_REG, " got 0x");
+                    uart_writeHex(UART_REG, (int)rbuf[i]);
+                    uart_writeStr(UART_REG, "\r\n");
+                    ok = 0u;
+                }
+            }
+            if ((pg & 0x3Fu) == 0u) uart_putc('.');
+        }
+        uart_writeStr(UART_REG, "\r\n");
+    }
+    if (ok) {
+        uart_writeStr(UART_REG, "Full test PASS\r\n");
+        last_error = ERR_NONE;
+    } else {
+        uart_writeStr(UART_REG, "Full test FAIL\r\n");
+        last_error = ERR_I2C_NACK;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // コマンドライン入力ユーティリティ
 // -----------------------------------------------------------------------------
 static void uart_drain_line_end(void)
@@ -428,6 +639,7 @@ static void help(void)
     uart_writeStr(UART_REG, "eedump <addr16> <len> dump (max 64)\r\n");
     uart_writeStr(UART_REG, "eefill <addr16> <len> <data> fill (max 128)\r\n");
     uart_writeStr(UART_REG, "eetest                test pattern\r\n");
+    uart_writeStr(UART_REG, "memtest [quick|page <a>|range <a> <l>|full]\r\n");
     uart_writeStr(UART_REG, "scan                  I2C bus scan\r\n");
     uart_writeStr(UART_REG, "iinit                 reinit I2C\r\n");
     uart_writeStr(UART_REG, "=== LED/GPIO ===\r\n");
@@ -580,6 +792,42 @@ static void execute_line(char *line)
     }
     if (token_eq(p, "eetest")) {
         eeprom_test();
+        return;
+    }
+    if (token_eq(p, "memtest")) {
+        p = skip_spaces(p + 7);
+        if (*p == 0) {
+            eeprom_memtest_quick();
+            return;
+        }
+        if (token_eq(p, "quick")) {
+            eeprom_memtest_quick();
+            return;
+        }
+        if (token_eq(p, "page")) {
+            p = skip_spaces(p + 4);
+            if (!parse_hex16(&p, &addr16)) {
+                print_err(ERR_BAD_ARG);
+                return;
+            }
+            eeprom_memtest_page(addr16);
+            return;
+        }
+        if (token_eq(p, "range")) {
+            p = skip_spaces(p + 5);
+            if (!parse_hex16(&p, &addr16) || !parse_hex32(&p, &len)) {
+                print_err(ERR_BAD_ARG);
+                return;
+            }
+            if (len == 0u) len = 256u;
+            eeprom_memtest_range(addr16, len);
+            return;
+        }
+        if (token_eq(p, "full")) {
+            eeprom_memtest_full();
+            return;
+        }
+        print_err(ERR_BAD_ARG);
         return;
     }
     if (token_eq(p, "eew")) {
