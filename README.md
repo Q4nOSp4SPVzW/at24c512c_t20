@@ -9,6 +9,102 @@ Sapphire SoC の I2C ペリフェラルで AT24C512C (64KB I2C EEPROM) を制御
 - 日付: `2026-06-18`
 - FW仮想レジスタベースアドレス: `0xF80FF000`
 
+## Sapphire SoC 構成
+
+Efinity Sapphire SoC IP (v3.4.0) を使用。Efinity IP Manager で生成した `ip/soc/` 配下の設定に基づく。
+
+### CPU コア
+
+| 項目 | 設定 |
+|------|------|
+| アーキテクチャ | RISC-V RV32IM (Zicsr + Zifencei) |
+| 圧縮命令 (C) | 無効 |
+| アトミック (A) | 無効 |
+| 浮動小数点 (F/D) | 無効 |
+| MMU / Supervisor | 無効 |
+| Custom Instruction | 無効 |
+| Barrel Shifter | 無効 |
+| MUL/DIV 高速拡張 | 無効 |
+| CSR 構成 | Reduced CSR |
+| コア数 | 1 |
+| 動作周波数 | 100 MHz (50MHz オシレータ → PLL → 100MHz) |
+| デバッグ | RISC-V Debug (ハードブレークポイント 0) |
+
+### キャッシュ
+
+| 項目 | 設定 |
+|------|------|
+| I-Cache | 4KB / 1way / 64B per line |
+| D-Cache | 4KB / 1way / 64B per line |
+
+### メモリマップ
+
+| 種別 | ベースアドレス | サイズ | 備考 |
+|------|---------------|--------|------|
+| 内蔵RAM (RAM_A) | `0xF9000000` | 8KB | ファームウェア + スタック |
+| AXI Slave | `0x01000000` | 16MB | RTLでダミー応答 (未使用) |
+| ペリフェラル空間 | `0xF8000000` | 16MB | 下記ペリフェラルを配置 |
+| CLINT | `0xF8B00000` | 64KB | タイマ・割り込み |
+| PLIC | `0xF8C00000` | 4MB | 外部割り込みコントローラ |
+
+### ペリフェラル
+
+| ペリフェラル | 有効 | ベースアドレス | サイズ | 詳細 |
+|--------------|:----:|---------------|--------|------|
+| UART0 | ✅ | `0xF8010000` | 64B | TX/RX FIFO 128, 9600bps 8N1 (FW設定) |
+| UART1 | ❌ | - | - | 無効 |
+| UART2 | ❌ | - | - | 無効 |
+| SPI0 | ✅ | `0xF8014000` | 4KB | Cmd/Rsp FIFO 256, 8bit, SS 1 (未使用) |
+| SPI1 / SPI2 | ❌ | - | - | 無効 |
+| I2C0 | ✅ | `0xF8016000` | 256B | 100kHz Standard Mode, AT24C512C 接続 |
+| I2C1 / I2C2 | ❌ | - | - | 無効 |
+| GPIO0 | ✅ | `0xF8015000` | 256B | 8bit, LED[6:0] 出力 / SW4 入力 |
+| GPIO1 | ❌ | - | - | 無効 |
+| Watchdog (WDT0) | ✅ | `0xF8017000` | 256B | prescaler 24bit, timeout 16bit, 2 counters |
+| Timer0/1/2 | ❌ | - | - | 無効 |
+| APB Slave0 | ✅ | `0xF8100000` | 64KB | 未使用 (RTLでダミー) |
+
+### 割り込み
+
+| 割り込み | ID | 有効 | 接続先 |
+|----------|:--:|:----:|--------|
+| UART0 | 1 | ✅ | PLIC |
+| SPI0 | 4 | ✅ | PLIC (未使用) |
+| I2C0 | 8 | ✅ | PLIC |
+| GPIO0 (bit0) | 12 | ✅ | PLIC |
+| GPIO0 (bit1) | 13 | ✅ | PLIC |
+| Watchdog | 32 | ✅ | PLIC (panic) |
+| USER_0 (外部) | 16 | ✅ | RTLで `1'b0` 固定 |
+| USER_1〜7 | 17,22-27 | ❌ | 無効 |
+
+> ファームウェアはポーリング方式で動作し、PLIC割り込みは未使用です。
+
+### RTL トップ接続
+
+```
+                clk_100m (PLL出力)
+                    │
+        ┌───────────┴───────────┐
+        │   Sapphire SoC (soc)  │
+        │                       │
+   UART │ ◄──── uart_rx_i (C3)  │
+        │ ────► uart_tx_o (D3)  │
+        │                       │
+    I2C │ ◄──► i2c_scl_io (B1) │ ──► AT24C512C SCL
+        │ ◄──► i2c_sda_io (B2) │ ──► AT24C512C SDA
+        │                       │
+   GPIO │ ◄──── sw4_i (P2)      │
+        │ ────► led_o[7:0]      │ ──► ユーザーLED
+        │                       │
+   AXI  │ ────► (ダミー応答)    │
+        │                       │
+        └───────────────────────┘
+```
+
+- I2C SCL/SDA はオープンドレン双方向 (RTLで `1'bz` / `1'b0` 切替)
+- LED[7] はFabric回路で独立点滅 (CPUクラッシュ時も継続)
+- AXI Master はRTLでダミー応答 (FPGA内未接続の周辺アクセス用)
+
 ## ボード配線
 
 | 信号 | ピン | GPIO | 説明 |
