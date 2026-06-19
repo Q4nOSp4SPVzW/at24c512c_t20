@@ -110,6 +110,15 @@ static void uart_put_label_hex(const char *label, u32 value)
     uart_writeStr(UART_REG, "\r\n");
 }
 
+// 1バイトを2桁16進で出力 (ダンプ表示用)
+static void uart_writeHex8(u8 value)
+{
+    u8 hi = (u8)((value >> 4) & 0xFu);
+    u8 lo = (u8)(value & 0xFu);
+    uart_putc(hi > 9u ? (char)('A' + hi - 10u) : (char)('0' + hi));
+    uart_putc(lo > 9u ? (char)('A' + lo - 10u) : (char)('0' + lo));
+}
+
 static char uart_getc(void)
 {
     return (char)(read_u32(UART_REG + UART_DATA) & 0xffu);
@@ -213,23 +222,38 @@ static u8 eeprom_read_bytes(u16 addr, u8 *data, u32 len)
     return 0u;
 }
 
-// I2Cバススキャン
+// I2Cバススキャン (各アドレス2回試行で確定)
+// i2c_rxAck は RX_VALID を待たず即読みする仕様 (writeトランザクションでは
+// スレーブACKが SDA を Low に引っ張ることで観測される)。
+// フェイクACKを排除するため各アドレス2回試行し、両方ACKの場合のみ報告する。
 static void i2c_scan(void)
 {
     uart_writeStr(UART_REG, "Scanning I2C bus 0x03..0x77...\r\n");
     for (u32 addr = 0x03u; addr <= 0x77u; addr++) {
         u8 slave = (u8)(addr << 1);
+        u8 ack1 = 0u, ack2 = 0u;
+
         i2c_masterStartBlocking(I2C_REG);
         i2c_txByte(I2C_REG, slave | I2C_WRITE);
         i2c_txNackBlocking(I2C_REG);
-        if (i2c_rxAck(I2C_REG)) {
+        ack1 = i2c_rxAck(I2C_REG);
+        i2c_masterStopBlocking(I2C_REG);
+
+        delay_cycles(2000u);
+
+        i2c_masterStartBlocking(I2C_REG);
+        i2c_txByte(I2C_REG, slave | I2C_WRITE);
+        i2c_txNackBlocking(I2C_REG);
+        ack2 = i2c_rxAck(I2C_REG);
+        i2c_masterStopBlocking(I2C_REG);
+
+        if (ack1 && ack2) {
             uart_writeStr(UART_REG, "Found: 0x");
             uart_writeHex(UART_REG, (int)addr);
             uart_writeStr(UART_REG, " (w:0x");
             uart_writeHex(UART_REG, (int)slave);
             uart_writeStr(UART_REG, ")\r\n");
         }
-        i2c_masterStopBlocking(I2C_REG);
     }
     uart_writeStr(UART_REG, "Scan done.\r\n");
 }
@@ -255,7 +279,7 @@ static void eeprom_test(void)
 
     u8 ok = 1u;
     for (u32 i = 0u; i < 16u; i++) {
-        uart_writeHex(UART_REG, (int)rbuf[i]);
+        uart_writeHex8(rbuf[i]);
         if (i < 15u) uart_putc(' ');
         if (rbuf[i] != wbuf[i]) ok = 0u;
     }
@@ -814,7 +838,7 @@ static void eeprom_dump(u16 addr, u32 len)
         uart_writeHex(UART_REG, (int)(addr + i));
         uart_writeStr(UART_REG, ": ");
         for (u32 j = i; j < line_end; j++) {
-            uart_writeHex(UART_REG, (int)buf[j]);
+            uart_writeHex8(buf[j]);
             uart_putc(' ');
         }
         uart_writeStr(UART_REG, "\r\n");
