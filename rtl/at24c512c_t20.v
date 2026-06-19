@@ -16,8 +16,12 @@ module at24c512c_t20 (
     output wire       uart_tx_o,   // UART送信 (ピン D3)
     input  wire       sw4_i,       // ユーザースイッチ SW4 (アクティブLow)
     output wire [7:0] led_o,       // ユーザーLED (アクティブLow)
-    inout  wire       i2c_scl_io,  // I2C SCL (ピン B1, GPIOL_44) オープンドレン
-    inout  wire       i2c_sda_io   // I2C SDA (ピン B2, GPIOL_45) オープンドレン
+    input  wire       i2c_scl_i,   // I2C SCL 入力 (ピン B1, GPIOL_44)
+    output wire       i2c_scl_o,   // I2C SCL 出力
+    output wire       i2c_scl_oe,  // I2C SCL 出力イネーブル
+    input  wire       i2c_sda_i,   // I2C SDA 入力 (ピン B2, GPIOL_45)
+    output wire       i2c_sda_o,   // I2C SDA 出力
+    output wire       i2c_sda_oe   // I2C SDA 出力イネーブル
 );
 
     // -------------------------------------------------------------------------
@@ -77,20 +81,23 @@ module at24c512c_t20 (
     wire       soc_async_reset;
 
     // -------------------------------------------------------------------------
-    // I2C オープンドレン双方向ピン
+    // I2C オープンドレン双方向ピン (Trion向け分離信号)
     // Sapphire SoC の I2C インタフェースは write/read の分離信号。
-    // write=1 → バス解放 (high-Z, 外部プルアップでHigh)
-    // write=0 → Low駆動
+    // write=1 → バス解放 (OE=0, 外部プルアップでHigh)
+    // write=0 → Low駆動 (OE=1, 出力=0)
     // -------------------------------------------------------------------------
     wire       i2c_scl_write;
     wire       i2c_scl_read;
     wire       i2c_sda_write;
     wire       i2c_sda_read;
 
-    assign i2c_scl_io = i2c_scl_write ? 1'bz : 1'b0;
-    assign i2c_sda_io = i2c_sda_write ? 1'bz : 1'b0;
-    assign i2c_scl_read = i2c_scl_io;
-    assign i2c_sda_read = i2c_sda_io;
+    assign i2c_scl_o  = 1'b0;
+    assign i2c_scl_oe = ~i2c_scl_write;
+    assign i2c_scl_read = i2c_scl_i;
+
+    assign i2c_sda_o  = 1'b0;
+    assign i2c_sda_oe = ~i2c_sda_write;
+    assign i2c_sda_read = i2c_sda_i;
 
     wire        axiA_awready;
     wire [7:0]  axiA_awlen;

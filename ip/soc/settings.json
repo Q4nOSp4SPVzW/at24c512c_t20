@@ -77,7 +77,7 @@
         "DDRWidth": "128",
         "DDR_IdWidth": "8",
         "DDRSize": "32'd3758096384",
-        "OCRSize": "16384",
+        "OCRSize": "8192",
         "AXISlave": "1'b1",
         "AXISlaveSize": "16777216",
         "GPIO1_INT_ID1": "15",
