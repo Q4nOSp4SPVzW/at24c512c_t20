@@ -709,9 +709,35 @@ I2CINIT = 0x1
 
 - 周波数: 100kHz (Standard Mode)
 - スレーブアドレス: 0xA0 (7-bit: 0x50, A2A1A0=000)
-- アドレス幅: 16-bit (64KB)
-- ページサイズ: 128バイト
+- アドレス幅: 16-bit
 - ライターイクルタイム: 5ms
+
+### 対応EEPROM
+
+`eetype` コマンドで実行時に切り替え可能。デフォルトは AT24C512C。
+
+| コマンド | EEPROM | 容量 | ページサイズ | 最大アドレス |
+|----------|--------|------|:----------:|:----------:|
+| `eetype 256` | AT24C256 | 32KB | 64B | 0x7FFF |
+| `eetype 512` | AT24C512C | 64KB | 128B | 0xFFFF |
+
+```
+> eetype 256
+EEPROM: AT24C256 32KB page=64
+
+> eetype 512
+EEPROM: AT24C512C 64KB page=128
+```
+
+`id` コマンドで現在のEEPROMタイプを確認可能:
+
+```
+> id
+ID INFO
+FW      = v1.0.0 AT24C512C
+...
+EE TYPE = AT24C512C 64KB
+```
 
 ## 必要な環境
 

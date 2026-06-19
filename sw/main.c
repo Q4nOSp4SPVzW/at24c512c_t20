@@ -22,14 +22,19 @@
 #define I2C_REG     SYSTEM_I2C_0_IO_CTRL
 
 #define EEPROM_SLAVE_ADDR  0xA0u
-#define EEPROM_PAGE_SIZE   128u
 #define EEPROM_WRITE_DELAY_MS  5u
 
+// EEPROMタイプ (実行時切り替え可)
+// AT24C256:  32KB, ページ64B,  最大アドレス 0x7FFF
+// AT24C512C: 64KB, ページ128B, 最大アドレス 0xFFFF
+#define EEPROM_TYPE_256  0u
+#define EEPROM_TYPE_512  1u
+#define EEPROM_PAGE_MAX  128u   // AT24C512Cのページサイズ (最大値)
+
 // 不揮発性保持テスト用アドレス・マジック
-#define NVM_TEST_ADDR      0xFFF0u
 #define NVM_TEST_MAGIC     0xA5u
-#define NVM_TEST_COUNT_OFF 1u   // 電源サイクルカウンタのオフセット
-#define NVM_TEST_TS_OFF    2u   // タイムスタンプのオフセット (2バイト)
+#define NVM_TEST_COUNT_OFF 1u
+#define NVM_TEST_TS_OFF    2u
 
 #define CPU_BLINK_PERIOD        1000000u
 #define WDT_PAT_PERIOD          100000u
@@ -65,6 +70,9 @@ static u32 last_error = ERR_NONE;
 static u8 wdt_enabled = 0u;
 static u8 wdt_hang = 0u;
 static u8 i2c_initialized = 0u;
+static u8 eeprom_type = EEPROM_TYPE_512;
+static u16 eeprom_page_size = 128u;
+static u16 eeprom_max_addr = 0xFFFFu;
 
 // -----------------------------------------------------------------------------
 // 遅延
@@ -185,7 +193,7 @@ static u8 eeprom_write_byte(u16 addr, u8 data)
 // ページ書き込み (最大128バイト)
 static u8 eeprom_write_page(u16 addr, u8 *data, u32 len)
 {
-    if (len > EEPROM_PAGE_SIZE) return ERR_RANGE;
+    if (len > eeprom_page_size) return ERR_RANGE;
     i2c_writeData_w(I2C_REG, EEPROM_SLAVE_ADDR, addr, data, len);
     delay_ms(EEPROM_WRITE_DELAY_MS);
     return 0u;
@@ -324,9 +332,9 @@ static void eeprom_memtest_quick(void)
 // ページテスト: 128バイト範囲でパターン検証
 static void eeprom_memtest_page(u16 addr)
 {
-    static u8 wbuf[EEPROM_PAGE_SIZE];
-    static u8 rbuf[EEPROM_PAGE_SIZE];
-    u16 page_base = (u16)(addr & 0xFF80u);
+    static u8 wbuf[EEPROM_PAGE_MAX];
+    static u8 rbuf[EEPROM_PAGE_MAX];
+    u16 page_base = (u16)(addr & (u16)~(eeprom_page_size - 1u));
 
     uart_writeStr(UART_REG, "Page test: 128 bytes at 0x");
     uart_writeHex(UART_REG, (int)page_base);
@@ -335,11 +343,11 @@ static void eeprom_memtest_page(u16 addr)
     u8 ok = 1u;
     for (u32 pat = 0u; pat < MEMTEST_PATTERNS_COUNT; pat++) {
         u8 w = memtest_patterns[pat];
-        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++)
+        for (u32 i = 0u; i < eeprom_page_size; i++)
             wbuf[i] = w;
-        eeprom_write_page(page_base, wbuf, EEPROM_PAGE_SIZE);
-        eeprom_read_bytes(page_base, rbuf, EEPROM_PAGE_SIZE);
-        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
+        eeprom_write_page(page_base, wbuf, eeprom_page_size);
+        eeprom_read_bytes(page_base, rbuf, eeprom_page_size);
+        for (u32 i = 0u; i < eeprom_page_size; i++) {
             if (rbuf[i] != w) {
                 uart_writeStr(UART_REG, "  FAIL @0x");
                 uart_writeHex(UART_REG, (int)(page_base + i));
@@ -366,9 +374,9 @@ static void eeprom_memtest_page(u16 addr)
 // フルテスト: 全64KB を3パターンでページ書き込み検証
 static void eeprom_memtest_full(void)
 {
-    static u8 wbuf[EEPROM_PAGE_SIZE];
-    static u8 rbuf[EEPROM_PAGE_SIZE];
-    const u32 total_pages = 0x10000u / EEPROM_PAGE_SIZE;
+    static u8 wbuf[EEPROM_PAGE_MAX];
+    static u8 rbuf[EEPROM_PAGE_MAX];
+    const u32 total_pages = ((u32)eeprom_max_addr + 1u) / eeprom_page_size;
 
     uart_writeStr(UART_REG, "Full test: 64KB x 3 patterns (page write)...\r\n");
     uart_writeStr(UART_REG, "WARNING: ~3000 write cycles. Do not run frequently.\r\n");
@@ -380,18 +388,18 @@ static void eeprom_memtest_full(void)
         uart_writeHex(UART_REG, (int)w);
         uart_writeStr(UART_REG, ": writing...\r\n");
 
-        for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) wbuf[i] = w;
+        for (u32 i = 0u; i < eeprom_page_size; i++) wbuf[i] = w;
         for (u32 pg = 0u; pg < total_pages; pg++) {
-            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
-            eeprom_write_page(base, wbuf, EEPROM_PAGE_SIZE);
+            u16 base = (u16)(pg * eeprom_page_size);
+            eeprom_write_page(base, wbuf, eeprom_page_size);
             if ((pg & 0x3Fu) == 0u) uart_putc('.');
         }
         uart_writeStr(UART_REG, "\r\nVerifying...\r\n");
 
         for (u32 pg = 0u; pg < total_pages; pg++) {
-            u16 base = (u16)(pg * EEPROM_PAGE_SIZE);
-            eeprom_read_bytes(base, rbuf, EEPROM_PAGE_SIZE);
-            for (u32 i = 0u; i < EEPROM_PAGE_SIZE; i++) {
+            u16 base = (u16)(pg * eeprom_page_size);
+            eeprom_read_bytes(base, rbuf, eeprom_page_size);
+            for (u32 i = 0u; i < eeprom_page_size; i++) {
                 if (rbuf[i] != w) {
                     uart_writeStr(UART_REG, "  FAIL @0x");
                     uart_writeHex(UART_REG, (int)(base + i));
@@ -420,7 +428,7 @@ static void eeprom_memtest_full(void)
 static void eeprom_memtest_range(u16 addr, u32 len)
 {
     if (len > 1024u) len = 1024u;
-    if ((u32)addr + len > 0x10000u) {
+    if ((u32)addr + len > (u32)eeprom_max_addr + 1u) {
         uart_writeStr(UART_REG, "ERR 6\r\n");
         last_error = ERR_RANGE;
         return;
@@ -475,8 +483,8 @@ static void eeprom_memtest_range(u16 addr, u32 len)
 // -----------------------------------------------------------------------------
 // 不揮発性保持テスト (NVM retention test)
 // -----------------------------------------------------------------------------
-// EEPROM の最終アドレス付近 (0xFFF0〜) を使用:
-//   [0xFFF0] Magic    (0xA5)  - テスト領域の有効性確認
+// EEPROM の最終アドレス付近を使用 (AT24C256: 0x7FF0, AT24C512C: 0xFFF0):
+//   [base+0] Magic    (0xA5)  - テスト領域の有効性確認
 //   [0xFFF1] Counter  (16bit, big-endian) - 電源サイクルカウンタ
 //   [0xFFF3] Checksum (XOR)    - データ保全性
 //
@@ -496,19 +504,21 @@ static u8 nvm_calc_checksum(u8 magic, u16 count)
 
 static void nvm_save(u16 count)
 {
-    eeprom_write_byte(NVM_TEST_ADDR,                   NVM_TEST_MAGIC);
-    eeprom_write_byte((u16)(NVM_TEST_ADDR + 1), (u8)(count >> 8));
-    eeprom_write_byte((u16)(NVM_TEST_ADDR + 2), (u8)(count & 0xFF));
-    eeprom_write_byte((u16)(NVM_TEST_ADDR + 3), nvm_calc_checksum(NVM_TEST_MAGIC, count));
+    u16 base = (u16)(eeprom_max_addr - 15u);
+    eeprom_write_byte(base,                   NVM_TEST_MAGIC);
+    eeprom_write_byte((u16)(base + 1), (u8)(count >> 8));
+    eeprom_write_byte((u16)(base + 2), (u8)(count & 0xFF));
+    eeprom_write_byte((u16)(base + 3), nvm_calc_checksum(NVM_TEST_MAGIC, count));
 }
 
 static u8 nvm_load(u16 *count)
 {
+    u16 base = (u16)(eeprom_max_addr - 15u);
     u8 magic = 0u, hi = 0u, lo = 0u, cksum = 0u;
-    eeprom_read_byte(NVM_TEST_ADDR,                   &magic);
-    eeprom_read_byte((u16)(NVM_TEST_ADDR + 1), &hi);
-    eeprom_read_byte((u16)(NVM_TEST_ADDR + 2), &lo);
-    eeprom_read_byte((u16)(NVM_TEST_ADDR + 3), &cksum);
+    eeprom_read_byte(base,                   &magic);
+    eeprom_read_byte((u16)(base + 1), &hi);
+    eeprom_read_byte((u16)(base + 2), &lo);
+    eeprom_read_byte((u16)(base + 3), &cksum);
 
     uart_put_label_hex("  Magic    = ", (u32)magic);
     uart_put_label_hex("  Counter  = ", (u32)(((u16)hi << 8) | lo));
@@ -533,8 +543,9 @@ static u8 nvm_load(u16 *count)
 
 static void nvm_clear(void)
 {
+    u16 base = (u16)(eeprom_max_addr - 15u);
     for (u32 i = 0u; i < 4u; i++)
-        eeprom_write_byte((u16)(NVM_TEST_ADDR + i), 0x00u);
+        eeprom_write_byte((u16)(base + i), 0x00u);
     uart_writeStr(UART_REG, "NVM test area cleared.\r\n");
     last_error = ERR_NONE;
 }
@@ -724,6 +735,12 @@ static void id_dump(void)
     uart_put_label_hex("FW_BASE = ", FW_REG_BASE);
     uart_put_label_hex("I2C_REG = ", I2C_REG);
     uart_put_label_hex("I2CINIT = ", i2c_initialized);
+    uart_writeStr(UART_REG, "EE TYPE = ");
+    if (eeprom_type == EEPROM_TYPE_256) {
+        uart_writeStr(UART_REG, "AT24C256 32KB\r\n");
+    } else {
+        uart_writeStr(UART_REG, "AT24C512C 64KB\r\n");
+    }
 }
 
 static void boot_banner(void)
@@ -753,6 +770,7 @@ static void help(void)
     uart_writeStr(UART_REG, "nvm save|load|inc|clear   retention test\r\n");
     uart_writeStr(UART_REG, "scan                  I2C bus scan\r\n");
     uart_writeStr(UART_REG, "iinit                 reinit I2C\r\n");
+    uart_writeStr(UART_REG, "eetype 256|512        select EEPROM type\r\n");
     uart_writeStr(UART_REG, "=== LED/GPIO ===\r\n");
     uart_writeStr(UART_REG, "1-6 a c s g           LED/SW4 control\r\n");
     uart_writeStr(UART_REG, "=== Misc ===\r\n");
@@ -783,7 +801,7 @@ static void eeprom_dump(u16 addr, u32 len)
 {
     u8 buf[DUMP_MAX];
     if (len > DUMP_MAX) len = DUMP_MAX;
-    if ((u32)addr + len > 0x10000u) {
+    if ((u32)addr + len > (u32)eeprom_max_addr + 1u) {
         print_err(ERR_RANGE);
         return;
     }
@@ -811,7 +829,7 @@ static void eeprom_fill(u16 addr, u32 len, u8 data)
 {
     u8 buf[FILL_MAX];
     if (len > FILL_MAX) len = FILL_MAX;
-    if ((u32)addr + len > 0x10000u) {
+    if ((u32)addr + len > (u32)eeprom_max_addr + 1u) {
         print_err(ERR_RANGE);
         return;
     }
@@ -894,6 +912,27 @@ static void execute_line(char *line)
     if (token_eq(p, "iinit")) {
         i2c_init();
         print_ok();
+        return;
+    }
+    if (token_eq(p, "eetype")) {
+        p = skip_spaces(p + 6);
+        if (token_eq(p, "256")) {
+            eeprom_type = EEPROM_TYPE_256;
+            eeprom_page_size = 64u;
+            eeprom_max_addr = 0x7FFFu;
+            uart_writeStr(UART_REG, "EEPROM: AT24C256 32KB page=64\r\n");
+            last_error = ERR_NONE;
+            return;
+        }
+        if (token_eq(p, "512")) {
+            eeprom_type = EEPROM_TYPE_512;
+            eeprom_page_size = 128u;
+            eeprom_max_addr = 0xFFFFu;
+            uart_writeStr(UART_REG, "EEPROM: AT24C512C 64KB page=128\r\n");
+            last_error = ERR_NONE;
+            return;
+        }
+        print_err(ERR_BAD_ARG);
         return;
     }
     if (token_eq(p, "scan")) {

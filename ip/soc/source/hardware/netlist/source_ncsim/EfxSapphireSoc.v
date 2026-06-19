@@ -1,6 +1,6 @@
 // Generator : SpinalHDL dev    git head : a69f4b9a329be784802c37cd8038b7dc9aec3094
 // Component : EfxSapphireSoc
-// Git hash  : 40495e95a5e28704ab515c41ca0253c2064e9dea
+// Git hash  : eaf6ac743e9ca2425590c94b2cfbddae44e8de9e
 
 `timescale 1ns/1ps
 
@@ -906,7 +906,7 @@ module EfxSapphireSoc (
   wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_ready;
   wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_last;
   wire       [0:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_opcode;
-  wire       [12:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address;
+  wire       [13:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address;
   wire       [1:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_length;
   wire       [31:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_data;
   wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_mask;
@@ -922,7 +922,7 @@ module EfxSapphireSoc (
   wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_ready;
   wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_last;
   wire       [0:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_opcode;
-  wire       [12:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_address;
+  wire       [13:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_address;
   wire       [1:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_length;
   wire       [31:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_data;
   wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_mask;
@@ -1730,7 +1730,7 @@ module EfxSapphireSoc (
     .io_bus_cmd_ready                    (system_ramA_logic_io_bus_cmd_ready                                                                  ), //o
     .io_bus_cmd_payload_last             (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_last                  ), //i
     .io_bus_cmd_payload_fragment_opcode  (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_opcode       ), //i
-    .io_bus_cmd_payload_fragment_address (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_address[12:0]), //i
+    .io_bus_cmd_payload_fragment_address (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_address[13:0]), //i
     .io_bus_cmd_payload_fragment_length  (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_length[1:0]  ), //i
     .io_bus_cmd_payload_fragment_data    (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_data[31:0]   ), //i
     .io_bus_cmd_payload_fragment_mask    (system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_combStage_payload_fragment_mask[3:0]    ), //i
@@ -2705,7 +2705,7 @@ module EfxSapphireSoc (
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_ready = system_bridge_bmb_unburstify_1_io_output_rsp_ready;
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_last = system_bridge_bmb_unburstify_1_io_output_cmd_payload_last;
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_opcode = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_opcode;
-  assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_address[12:0];
+  assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_address[13:0];
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_length = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_length;
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_data = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_data;
   assign system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_mask = system_bridge_bmb_unburstify_1_io_output_cmd_payload_fragment_mask;
@@ -8182,7 +8182,7 @@ module BmbOnChipRam (
   output wire          io_bus_cmd_ready,
   input  wire          io_bus_cmd_payload_last,
   input  wire [0:0]    io_bus_cmd_payload_fragment_opcode,
-  input  wire [12:0]   io_bus_cmd_payload_fragment_address,
+  input  wire [13:0]   io_bus_cmd_payload_fragment_address,
   input  wire [1:0]    io_bus_cmd_payload_fragment_length,
   input  wire [31:0]   io_bus_cmd_payload_fragment_data,
   input  wire [3:0]    io_bus_cmd_payload_fragment_mask,
@@ -8202,17 +8202,17 @@ module BmbOnChipRam (
   wire                io_bus_rsp_isStall;
   reg                 io_bus_cmd_valid_regNextWhen;
   reg        [3:0]    io_bus_cmd_payload_fragment_context_regNextWhen;
-  wire       [10:0]   address;
+  wire       [11:0]   address;
   wire       [31:0]   data;
   wire                io_bus_cmd_fire;
   wire                enable;
   wire                write;
   wire       [3:0]    mask;
   wire       [31:0]   _zz_io_bus_rsp_payload_fragment_data;
-  reg [7:0] ram_symbol0 [0:2047];
-  reg [7:0] ram_symbol1 [0:2047];
-  reg [7:0] ram_symbol2 [0:2047];
-  reg [7:0] ram_symbol3 [0:2047];
+  reg [7:0] ram_symbol0 [0:4095];
+  reg [7:0] ram_symbol1 [0:4095];
+  reg [7:0] ram_symbol2 [0:4095];
+  reg [7:0] ram_symbol3 [0:4095];
   reg [7:0] _zz_ramsymbol_read;
   reg [7:0] _zz_ramsymbol_read_1;
   reg [7:0] _zz_ramsymbol_read_2;
@@ -8447,7 +8447,7 @@ module BmbDecoder_1 (
   assign logic_input_payload_fragment_mask = io_input_cmd_payload_fragment_mask;
   assign logic_input_payload_fragment_context = io_input_cmd_payload_fragment_context;
   assign logic_noHitS0 = (! (|{logic_hitsS0_2,{logic_hitsS0_1,logic_hitsS0_0}}));
-  assign logic_hitsS0_0 = ((io_input_cmd_payload_fragment_address & (~ 32'h00001fff)) == 32'hf9000000);
+  assign logic_hitsS0_0 = ((io_input_cmd_payload_fragment_address & (~ 32'h00003fff)) == 32'hf9000000);
   always @(*) begin
     io_outputs_0_cmd_valid = (logic_input_valid && logic_hitsS0_0);
     if(logic_cmdWait) begin

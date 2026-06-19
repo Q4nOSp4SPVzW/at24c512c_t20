@@ -4,7 +4,7 @@ ENTRY( _start )
 
 MEMORY
 {
-  ram  (wxai!r) : ORIGIN = 0xF9000000, LENGTH = 8K
+  ram  (wxai!r) : ORIGIN = 0xF9000000, LENGTH = 16K
 }
 
 PHDRS
@@ -14,7 +14,7 @@ PHDRS
 
 SECTIONS
 {
-  __stack_size = DEFINED(__stack_size) ? __stack_size : 1024;
+  __stack_size = DEFINED(__stack_size) ? __stack_size : 2048;
 
   .init           :
   {
