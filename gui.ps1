@@ -16,7 +16,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+try {
+    if ([Console]::OpenStandardOutput() -ne [System.IO.Stream]::Null) {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    }
+} catch {
+    # GUI EXE (-noConsole) ではコンソールハンドルが無いため無視する
+}
 
 # -----------------------------------------------------------------------------
 # WPF アセンブリ読み込み

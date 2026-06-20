@@ -228,8 +228,8 @@ static u8 eeprom_read_bytes(u16 addr, u8 *data, u32 len)
 // フェイクACKを排除するため各アドレス2回試行し、両方ACKの場合のみ報告する。
 static void i2c_scan(void)
 {
-    uart_writeStr(UART_REG, "Scanning I2C bus 0x03..0x77...\r\n");
-    for (u32 addr = 0x03u; addr <= 0x77u; addr++) {
+    uart_writeStr(UART_REG, "Scanning AT24C EEPROM range 0x50..0x57...\r\n");
+    for (u32 addr = 0x50u; addr <= 0x57u; addr++) {
         u8 slave = (u8)(addr << 1);
         u8 ack1 = 0u, ack2 = 0u;
 
@@ -690,6 +690,32 @@ static u8 parse_hex32(char **pp, u32 *value)
     return 1u;
 }
 
+static u8 parse_len32(char **pp, u32 *value)
+{
+    char *p = skip_spaces(*pp);
+    u32 parsed = 0u;
+    u32 digit = 0u;
+    u8 count = 0u;
+
+    if (p[0] == '0' && to_lower(p[1]) == 'x') {
+        return parse_hex32(pp, value);
+    }
+
+    while (*p >= '0' && *p <= '9') {
+        if (count >= 10u) return 0u;
+        digit = (u32)(*p - '0');
+        if (parsed > 429496729u || (parsed == 429496729u && digit > 5u)) return 0u;
+        parsed = (parsed * 10u) + digit;
+        p++;
+        count++;
+    }
+    if (count == 0u) return 0u;
+
+    *value = parsed;
+    *pp = p;
+    return 1u;
+}
+
 static u8 parse_hex16(char **pp, u16 *value)
 {
     u32 v = 0u;
@@ -989,7 +1015,7 @@ static void execute_line(char *line)
         }
         if (token_eq(p, "range")) {
             p = skip_spaces(p + 5);
-            if (!parse_hex16(&p, &addr16) || !parse_hex32(&p, &len)) {
+            if (!parse_hex16(&p, &addr16) || !parse_len32(&p, &len)) {
                 print_err(ERR_BAD_ARG);
                 return;
             }
@@ -1053,7 +1079,7 @@ static void execute_line(char *line)
     }
     if (token_eq(p, "eedump")) {
         p = skip_spaces(p + 6);
-        if (!parse_hex16(&p, &addr16) || !parse_hex32(&p, &len)) {
+        if (!parse_hex16(&p, &addr16) || !parse_len32(&p, &len)) {
             print_err(ERR_BAD_ARG);
             return;
         }
@@ -1063,7 +1089,7 @@ static void execute_line(char *line)
     }
     if (token_eq(p, "eefill")) {
         p = skip_spaces(p + 6);
-        if (!parse_hex16(&p, &addr16) || !parse_hex32(&p, &len) || !parse_hex8(&p, &data8)) {
+        if (!parse_hex16(&p, &addr16) || !parse_len32(&p, &len) || !parse_hex8(&p, &data8)) {
             print_err(ERR_BAD_ARG);
             return;
         }
