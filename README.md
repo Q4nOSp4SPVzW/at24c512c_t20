@@ -1,5 +1,8 @@
 # T20 Sapphire SoC AT24C512C I2C EEPROM
 
+[![Firmware Build](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/firmware.yml/badge.svg)](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/firmware.yml)
+[![Script Validation](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/scripts.yml/badge.svg)](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/scripts.yml)
+
 Trion T20 BGA256 開発ボード向けの Sapphire SoC RV32 プロジェクトです。
 Sapphire SoC の I2C ペリフェラルで AT24C512C/AT24C256 I2C EEPROM を制御します。
 
@@ -537,3 +540,14 @@ EEPROM: AT24C512C 64KB page=128
 > 4. 「Generate」ボタンでIPを再生成
 > 5. `ip/soc/soc.v` と `embedded_sw/` が自動更新される
 > 6. その後 `build_sw.ps1` → `build.ps1` → `program.ps1` の順に実行
+
+## CI (GitHub Actions)
+
+push / PR 時に以下のCIが自動実行されます:
+
+| ワークフロー | トリガー | 内容 |
+|---|---|---|
+| [Firmware Build](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/firmware.yml) | `sw/`, `embedded_sw/` 変更時 | RISC-V GCC でファームウェアをビルドし、ELF/BIN/MAPをartifact生成 |
+| [Script Validation](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/scripts.yml) | `*.ps1` 変更時 | PowerShellスクリプトの構文チェック (test/build_sw/build/program.ps1) |
+
+> FPGAビルド (Efinity) はライセンスが必要なためCI対象外。実機テスト (test.ps1) はハードウェア接続が必要なためCI対象外。
