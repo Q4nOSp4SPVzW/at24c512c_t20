@@ -550,15 +550,27 @@ EEPROM: AT24C512C 64KB page=128
 .\gui.ps1        # GUIコントロールパネル (オプション: -DefaultPort COMxx)
 ```
 
-## GUIコントロールパネル (gui.ps1)
+## GUIコントロールパネル
 
-WPFベースのGUIダッシュボードから全機能を操作できます。PowerShell単体で動作し、追加インストール不要です。
+![C# WPF GUI](docs/images/gui-csharp-wpf.png)
+
+WPFベースのGUIダッシュボードから全機能を操作できます。COMポート接続、LED操作、SW4状態表示、EEPROM読み書き、WDT、システム情報表示、生コマンド送信を1画面で扱えます。
+
+配布用にはC# WPF版EXEを推奨します。PowerShell版も同じ操作体系で利用できます。
 
 ### 使用法
 
 ```powershell
-.\gui.ps1                    # デフォルト COM11
-.\gui.ps1 -DefaultPort COM5  # ポート指定
+.\dist\AT24C512C_GUI_CSharp.exe  # C# WPF版 (推奨)
+.\dist\AT24C512C_GUI.exe         # PowerShell WPF版をEXE化したもの
+.\gui.ps1                       # PowerShellスクリプト版 (デフォルト COM11)
+.\gui.ps1 -DefaultPort COM5     # ポート指定
+```
+
+C# WPF版を再ビルドする場合:
+
+```powershell
+.\build_csharp_wpf.ps1
 ```
 
 ### 機能
