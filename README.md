@@ -547,7 +547,33 @@ EEPROM: AT24C512C 64KB page=128
 .\build.ps1      # Efinity FPGAビルド（合成・配置配線）
 .\program.ps1    # FPGAへ書き込み
 .\test.ps1       # 全コマンド動作テスト (オプション: -Port COMxx)
+.\gui.ps1        # GUIコントロールパネル (オプション: -DefaultPort COMxx)
 ```
+
+## GUIコントロールパネル (gui.ps1)
+
+WPFベースのGUIダッシュボードから全機能を操作できます。PowerShell単体で動作し、追加インストール不要です。
+
+### 使用法
+
+```powershell
+.\gui.ps1                    # デフォルト COM11
+.\gui.ps1 -DefaultPort COM5  # ポート指定
+```
+
+### 機能
+
+| パネル | 機能 |
+|---|---|
+| **Connection** | COMポート選択・Connect/Disconnect |
+| **LED Control** | LED1〜6 個別トグル / 全点灯 / 全消灯 |
+| **SW4 Status** | リアルタイム状態表示 (Refresh / Auto ポーリング) |
+| **EEPROM Access** | 1バイト読み書き / ダンプ / フィル / eetest / I2Cスキャン |
+| **EEPROM Type** | AT24C256(32KB) / AT24C512C(64KB) 切替 |
+| **Watchdog** | WDT 有効化 / ハートビート / 無効化 |
+| **System** | id / dump 表示 |
+| **ログエリア** | 全コマンド・応答を時刻付きで記録 |
+| **生コマンド入力** | 任意コマンド送信 (Enter or Send) |
 
 > **重要: SoC IP の再生成が必要**
 >
@@ -566,6 +592,6 @@ push / PR 時に以下のCIが自動実行されます:
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
 | [Firmware Build](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/firmware.yml) | `sw/`, `embedded_sw/` 変更時 | RISC-V GCC でファームウェアをビルドし、ELF/BIN/MAPをartifact生成 |
-| [Script Validation](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/scripts.yml) | `*.ps1` 変更時 | PowerShellスクリプトの構文チェック (test/build_sw/build/program.ps1) |
+| [Script Validation](https://github.com/Q4nOSp4SPVzW/at24c512c_t20/actions/workflows/scripts.yml) | `*.ps1` 変更時 | PowerShellスクリプトの構文チェック (test/gui/build_sw/build/program.ps1) |
 
 > FPGAビルド (Efinity) はライセンスが必要なためCI対象外。実機テスト (test.ps1) はハードウェア接続が必要なためCI対象外。
