@@ -527,12 +527,19 @@ foreach ($t in $Tests) {
     $body = ($lines -join "`r`n").Trim()
 
     if ($body -match $t.Pass) {
+        # PASS時も応答を表示 (何をテストしたか視覚的にわかるように)
+        $disp = if ($body.Length -gt 300) { $body.Substring(0,300) + "..." } else { $body }
+        if ($disp) {
+            Write-Host "      RESPONSE:" -ForegroundColor DarkGray
+            foreach ($l in ($disp -split "`r`n")) { if ($l.Trim()) { Write-Host "        $l" -ForegroundColor DarkGray } }
+        }
         Write-Host "      RESULT: PASS" -ForegroundColor Green
         $passed++
     } else {
-        # 出力が長い場合は先頭200文字だけ表示
-        $disp = if ($body.Length -gt 200) { $body.Substring(0,200) + "..." } else { $body }
-        Write-Host "      OUTPUT: $disp" -ForegroundColor Yellow
+        # 出力が長い場合は先頭300文字だけ表示
+        $disp = if ($body.Length -gt 300) { $body.Substring(0,300) + "..." } else { $body }
+        Write-Host "      RESPONSE:" -ForegroundColor Yellow
+        foreach ($l in ($disp -split "`r`n")) { if ($l.Trim()) { Write-Host "        $l" -ForegroundColor Yellow } }
         Write-Host "      EXPECT : $($t.Pass)" -ForegroundColor DarkYellow
         Write-Host "      RESULT: FAIL" -ForegroundColor Red
         $failed++
@@ -566,3 +573,5 @@ if ($failed -eq 0) {
     Write-Host " *** SOME TESTS FAILED ***" -ForegroundColor Red
 }
 Write-Host ""
+Write-Host "Enterキーを押すと終了します..." -ForegroundColor Cyan -NoNewline
+Read-Host
