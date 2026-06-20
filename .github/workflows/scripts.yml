@@ -1,0 +1,86 @@
+name: Script Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'test.ps1'
+      - 'build_sw.ps1'
+      - 'build.ps1'
+      - 'program.ps1'
+      - '.github/workflows/scripts.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'test.ps1'
+      - 'build_sw.ps1'
+      - 'build.ps1'
+      - 'program.ps1'
+      - '.github/workflows/scripts.yml'
+
+jobs:
+  validate:
+    name: Validate PowerShell Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Syntax check test.ps1
+        run: |
+          pwsh -NoProfile -Command "
+            \$tokens = \$null
+            \$errors = \$null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content 'test.ps1' -Raw), [ref]\$errors)
+            if (\$errors.Count -gt 0) {
+              Write-Host 'Syntax errors in test.ps1:'
+              \$errors | ForEach-Object { Write-Host \"  Line \$(\$_.Token.StartLine): \$(\$_.Message)\" }
+              exit 1
+            }
+            Write-Host 'test.ps1: syntax OK'
+          "
+
+      - name: Syntax check build_sw.ps1
+        run: |
+          pwsh -NoProfile -Command "
+            \$errors = \$null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content 'build_sw.ps1' -Raw), [ref]\$errors)
+            if (\$errors.Count -gt 0) {
+              Write-Host 'Syntax errors in build_sw.ps1:'
+              \$errors | ForEach-Object { Write-Host \"  \$(\$_.Message)\" }
+              exit 1
+            }
+            Write-Host 'build_sw.ps1: syntax OK'
+          "
+
+      - name: Syntax check build.ps1
+        run: |
+          pwsh -NoProfile -Command "
+            \$errors = \$null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content 'build.ps1' -Raw), [ref]\$errors)
+            if (\$errors.Count -gt 0) {
+              Write-Host 'Syntax errors in build.ps1:'
+              \$errors | ForEach-Object { Write-Host \"  \$(\$_.Message)\" }
+              exit 1
+            }
+            Write-Host 'build.ps1: syntax OK'
+          "
+
+      - name: Syntax check program.ps1
+        run: |
+          pwsh -NoProfile -Command "
+            \$errors = \$null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content 'program.ps1' -Raw), [ref]\$errors)
+            if (\$errors.Count -gt 0) {
+              Write-Host 'Syntax errors in program.ps1:'
+              \$errors | ForEach-Object { Write-Host \"  \$(\$_.Message)\" }
+              exit 1
+            }
+            Write-Host 'program.ps1: syntax OK'
+          "

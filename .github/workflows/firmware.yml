@@ -1,0 +1,73 @@
+name: Firmware Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sw/**'
+      - 'embedded_sw/**'
+      - '.github/workflows/firmware.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sw/**'
+      - 'embedded_sw/**'
+      - '.github/workflows/firmware.yml'
+
+jobs:
+  build:
+    name: Build RISC-V Firmware
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install RISC-V toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-riscv64-unknown-elf
+
+      - name: Verify toolchain
+        run: |
+          riscv64-unknown-elf-gcc --version
+          riscv64-unknown-elf-size --version
+
+      - name: Build firmware
+        run: |
+          mkdir -p sw/build
+          riscv64-unknown-elf-gcc \
+            -march=rv32im_zicsr_zifencei \
+            -mabi=ilp32 \
+            -Os \
+            -ffreestanding \
+            -fno-builtin \
+            -nostdlib \
+            -nostartfiles \
+            -msmall-data-limit=0 \
+            -I embedded_sw/soc/bsp/efinix/EfxSapphireSoc/include \
+            -I embedded_sw/soc/software/standalone/driver \
+            -Wl,--gc-sections \
+            -Wl,-T,sw/linker.ld \
+            -Wl,-Map,sw/build/at24c512c.map \
+            sw/crt0.S \
+            sw/main.c \
+            -o sw/build/at24c512c.elf
+
+      - name: Show size
+        run: |
+          riscv64-unknown-elf-size sw/build/at24c512c.elf
+
+      - name: Generate BIN
+        run: |
+          riscv64-unknown-elf-objcopy -O binary sw/build/at24c512c.elf sw/build/at24c512c.bin
+          ls -la sw/build/
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            sw/build/at24c512c.elf
+            sw/build/at24c512c.bin
+            sw/build/at24c512c.map
