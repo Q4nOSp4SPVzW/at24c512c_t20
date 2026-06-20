@@ -139,7 +139,7 @@ $failed = 0
 $failedNames = @()
 $testNum = 0
 $prevGroup = ""
-$groupResults = @{}
+$groupResults = [System.Collections.Specialized.OrderedDictionary]@{}
 
 foreach ($t in $Tests) {
     $testNum++
@@ -149,7 +149,7 @@ foreach ($t in $Tests) {
         if ($prevGroup) { Write-Host "" }
         Write-Host ("--- {0} ---" -f $t.Group) -ForegroundColor Cyan
         $prevGroup = $t.Group
-        if (-not $groupResults.ContainsKey($t.Group)) {
+        if (-not $groupResults.Contains($t.Group)) {
             $groupResults[$t.Group] = @{ Pass=0; Fail=0 }
         }
     }
