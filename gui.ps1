@@ -84,121 +84,144 @@ function Disconnect-Serial {
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AT24C256 EEPROM Control Panel" Height="700" Width="900"
+        Title="AT24C256 EEPROM Control Panel" Height="560" Width="920"
+        MinHeight="480" MinWidth="760"
         Background="#FF1E1E1E" WindowStartupLocation="CenterScreen">
-    <Grid Margin="10">
+    <Grid Margin="8">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280"/>
-            <ColumnDefinition Width="10"/>
+            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="8"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- 左ペイン: 操作パネル -->
-        <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="5">
+        <!-- 左ペイン: 操作パネル (WrapPanel で2カラム配置) -->
+        <ScrollViewer Grid.Row="0" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Hidden">
+            <StackPanel Margin="2">
 
                 <!-- 接続パネル -->
-                <GroupBox Header="Connection" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <StackPanel Margin="5">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                            <Label Content="Port:" Foreground="White" Width="40"/>
-                            <TextBox x:Name="PortBox" Width="100" Text="$DefaultPort" Background="#FF333333" Foreground="White" BorderBrush="#FF555555"/>
+                <GroupBox Header="Connection" Foreground="White" Margin="0,0,0,6" BorderBrush="#FF444444" Padding="4">
+                    <StackPanel Margin="3">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Label Content="Port:" Foreground="White" Width="40" Padding="0,2,0,2" VerticalAlignment="Center"/>
+                            <TextBox x:Name="PortBox" Width="100" Text="$DefaultPort" Background="#FF333333" Foreground="White" BorderBrush="#FF555555" Padding="2,1,2,1"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button x:Name="BtnConnect" Content="Connect" Width="100" Height="28" Margin="0,0,5,0" Background="#FF2D5F2D" Foreground="White"/>
-                            <Button x:Name="BtnDisconnect" Content="Disconnect" Width="100" Height="28" Background="#FF5F2D2D" Foreground="White" IsEnabled="False"/>
+                            <Button x:Name="BtnConnect" Content="Connect" Width="95" Height="26" Margin="0,0,4,0" Background="#FF2D5F2D" Foreground="White"/>
+                            <Button x:Name="BtnDisconnect" Content="Disconnect" Width="95" Height="26" Background="#FF5F2D2D" Foreground="White" IsEnabled="False"/>
                         </StackPanel>
-                        <TextBlock x:Name="StatusText" Text="Disconnected" Foreground="#FFCCCCCC" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        <TextBlock x:Name="StatusText" Text="Disconnected" Foreground="#FFCCCCCC" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                     </StackPanel>
                 </GroupBox>
 
-                <!-- LED操作パネル -->
-                <GroupBox Header="LED Control" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <StackPanel Margin="5">
-                        <UniformGrid Columns="3" Margin="0,0,0,5">
-                            <Button x:Name="Led1" Content="LED1" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="Led2" Content="LED2" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="Led3" Content="LED3" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="Led4" Content="LED4" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="Led5" Content="LED5" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="Led6" Content="LED6" Height="28" Margin="2" Background="#FF333333" Foreground="White"/>
-                        </UniformGrid>
-                        <UniformGrid Columns="2" Margin="0,0,0,5">
-                            <Button x:Name="BtnLedAll" Content="All ON" Height="28" Margin="2" Background="#FF2D5F2D" Foreground="White"/>
-                            <Button x:Name="BtnLedClear" Content="All OFF" Height="28" Margin="2" Background="#FF5F2D2D" Foreground="White"/>
-                        </UniformGrid>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- SW4状態 -->
-                <GroupBox Header="SW4 Status" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <StackPanel Margin="5" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock x:Name="Sw4Status" Text="---" FontSize="20" FontWeight="Bold" Foreground="#FFAAAAAA" VerticalAlignment="Center"/>
-                        <Button x:Name="BtnSw4Refresh" Content="Refresh" Width="70" Height="28" Margin="10,0,0,0" Background="#FF333333" Foreground="White"/>
-                        <CheckBox x:Name="Sw4Poll" Content="Auto" Foreground="White" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </GroupBox>
+                <!-- 1行目: LED + SW4 -->
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <GroupBox Grid.Column="0" Header="LED" Foreground="White" BorderBrush="#FF444444" Padding="4">
+                        <StackPanel Margin="2">
+                            <UniformGrid Columns="3" Margin="0,0,0,3">
+                                <Button x:Name="Led1" Content="L1" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <Button x:Name="Led2" Content="L2" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <Button x:Name="Led3" Content="L3" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <Button x:Name="Led4" Content="L4" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <Button x:Name="Led5" Content="L5" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <Button x:Name="Led6" Content="L6" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                            </UniformGrid>
+                            <UniformGrid Columns="2" Margin="0,0,0,0">
+                                <Button x:Name="BtnLedAll" Content="All ON" Height="24" Margin="1" Background="#FF2D5F2D" Foreground="White" FontSize="11"/>
+                                <Button x:Name="BtnLedClear" Content="All OFF" Height="24" Margin="1" Background="#FF5F2D2D" Foreground="White" FontSize="11"/>
+                            </UniformGrid>
+                        </StackPanel>
+                    </GroupBox>
+                    <GroupBox Grid.Column="2" Header="SW4" Foreground="White" BorderBrush="#FF444444" Padding="4">
+                        <StackPanel Margin="2" VerticalAlignment="Center">
+                            <TextBlock x:Name="Sw4Status" Text="---" FontSize="16" FontWeight="Bold" Foreground="#FFAAAAAA" HorizontalAlignment="Center" Margin="0,4,0,4"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button x:Name="BtnSw4Refresh" Content="Refresh" Width="60" Height="24" Margin="0,0,4,0" Background="#FF333333" Foreground="White" FontSize="11"/>
+                                <CheckBox x:Name="Sw4Poll" Content="Auto" Foreground="White" VerticalAlignment="Center" FontSize="11"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+                </Grid>
 
                 <!-- EEPROM読み書き -->
-                <GroupBox Header="EEPROM Access" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <StackPanel Margin="5">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                            <Label Content="Addr:" Foreground="White" Width="45"/>
-                            <TextBox x:Name="EeAddr" Width="80" Text="0x0000" Background="#FF333333" Foreground="White" BorderBrush="#FF555555"/>
-                            <Label Content="Data:" Foreground="White" Width="45" Margin="5,0,0,0"/>
-                            <TextBox x:Name="EeData" Width="60" Text="0xAB" Background="#FF333333" Foreground="White" BorderBrush="#FF555555"/>
-                        </StackPanel>
-                        <UniformGrid Columns="2" Margin="0,0,0,5">
-                            <Button x:Name="BtnEeRead" Content="Read Byte" Height="26" Margin="2" Background="#FF2D4F5F" Foreground="White"/>
-                            <Button x:Name="BtnEeWrite" Content="Write Byte" Height="26" Margin="2" Background="#FF4F2D5F" Foreground="White"/>
+                <GroupBox Header="EEPROM Access" Foreground="White" Margin="0,0,0,6" BorderBrush="#FF444444" Padding="4">
+                    <StackPanel Margin="3">
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Content="Addr:" Foreground="White" Padding="0,2,4,2" VerticalAlignment="Center" FontSize="11"/>
+                            <TextBox Grid.Column="1" x:Name="EeAddr" Text="0x0000" Background="#FF333333" Foreground="White" BorderBrush="#FF555555" Padding="2,1,2,1" FontSize="11"/>
+                            <Label Grid.Column="2" Content="Data:" Foreground="White" Padding="4,2,4,2" VerticalAlignment="Center" FontSize="11"/>
+                            <TextBox Grid.Column="3" x:Name="EeData" Text="0xAB" Background="#FF333333" Foreground="White" BorderBrush="#FF555555" Padding="2,1,2,1" FontSize="11"/>
+                        </Grid>
+                        <UniformGrid Columns="2" Margin="0,0,0,3">
+                            <Button x:Name="BtnEeRead" Content="Read" Height="24" Margin="1" Background="#FF2D4F5F" Foreground="White" FontSize="11"/>
+                            <Button x:Name="BtnEeWrite" Content="Write" Height="24" Margin="1" Background="#FF4F2D5F" Foreground="White" FontSize="11"/>
                         </UniformGrid>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                            <Label Content="Len:" Foreground="White" Width="45"/>
-                            <TextBox x:Name="EeDumpLen" Width="60" Text="16" Background="#FF333333" Foreground="White" BorderBrush="#FF555555"/>
-                            <Button x:Name="BtnEeDump" Content="Dump" Width="70" Height="26" Margin="5,0,0,0" Background="#FF333333" Foreground="White"/>
-                        </StackPanel>
-                        <UniformGrid Columns="3" Margin="0,0,0,5">
-                            <Button x:Name="BtnEeTest" Content="Test" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="BtnEeFill" Content="Fill" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
-                            <Button x:Name="BtnEeScan" Content="Scan" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Content="Len:" Foreground="White" Padding="0,2,4,2" VerticalAlignment="Center" FontSize="11"/>
+                            <TextBox Grid.Column="1" x:Name="EeDumpLen" Text="16" Background="#FF333333" Foreground="White" BorderBrush="#FF555555" Padding="2,1,2,1" FontSize="11"/>
+                            <Button Grid.Column="2" x:Name="BtnEeDump" Content="Dump" Width="60" Height="24" Margin="4,0,0,0" Background="#FF333333" Foreground="White" FontSize="11"/>
+                        </Grid>
+                        <UniformGrid Columns="3" Margin="0,0,0,0">
+                            <Button x:Name="BtnEeTest" Content="Test" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                            <Button x:Name="BtnEeFill" Content="Fill" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
+                            <Button x:Name="BtnEeScan" Content="Scan" Height="24" Margin="1" Background="#FF333333" Foreground="White" FontSize="11"/>
                         </UniformGrid>
                     </StackPanel>
                 </GroupBox>
 
-                <!-- EEPROMタイプ -->
-                <GroupBox Header="EEPROM Type" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <StackPanel Margin="5" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <RadioButton x:Name="Type256" Content="AT24C256 (32KB)" Foreground="White" Margin="0,0,10,0" GroupName="EeType"/>
-                        <RadioButton x:Name="Type512" Content="AT24C512C (64KB)" Foreground="White" GroupName="EeType"/>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- WDT -->
-                <GroupBox Header="Watchdog" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <UniformGrid Columns="3" Margin="5">
-                        <Button x:Name="BtnWdtOn" Content="ON" Height="26" Margin="2" Background="#FF2D5F2D" Foreground="White"/>
-                        <Button x:Name="BtnWdtPat" Content="PAT" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
-                        <Button x:Name="BtnWdtOff" Content="OFF" Height="26" Margin="2" Background="#FF5F2D2D" Foreground="White"/>
-                    </UniformGrid>
-                </GroupBox>
-
-                <!-- システム情報 -->
-                <GroupBox Header="System" Foreground="White" Margin="0,0,0,8" BorderBrush="#FF444444">
-                    <UniformGrid Columns="2" Margin="5">
-                        <Button x:Name="BtnId" Content="ID" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
-                        <Button x:Name="BtnDump" Content="Dump" Height="26" Margin="2" Background="#FF333333" Foreground="White"/>
-                    </UniformGrid>
-                </GroupBox>
+                <!-- 1行: EEPROM Type + WDT + System -->
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <GroupBox Grid.Column="0" Header="Type" Foreground="White" BorderBrush="#FF444444" Padding="3">
+                        <StackPanel Margin="2" VerticalAlignment="Center">
+                            <RadioButton x:Name="Type256" Content="256" Foreground="White" GroupName="EeType" FontSize="11" Margin="0,1,0,1"/>
+                            <RadioButton x:Name="Type512" Content="512" Foreground="White" GroupName="EeType" FontSize="11" Margin="0,1,0,1"/>
+                        </StackPanel>
+                    </GroupBox>
+                    <GroupBox Grid.Column="2" Header="WDT" Foreground="White" BorderBrush="#FF444444" Padding="3">
+                        <UniformGrid Columns="1" Margin="2">
+                            <Button x:Name="BtnWdtOn" Content="ON" Height="22" Margin="0,1" Background="#FF2D5F2D" Foreground="White" FontSize="10"/>
+                            <Button x:Name="BtnWdtPat" Content="PAT" Height="22" Margin="0,1" Background="#FF333333" Foreground="White" FontSize="10"/>
+                            <Button x:Name="BtnWdtOff" Content="OFF" Height="22" Margin="0,1" Background="#FF5F2D2D" Foreground="White" FontSize="10"/>
+                        </UniformGrid>
+                    </GroupBox>
+                    <GroupBox Grid.Column="4" Header="System" Foreground="White" BorderBrush="#FF444444" Padding="3">
+                        <UniformGrid Columns="1" Margin="2">
+                            <Button x:Name="BtnId" Content="ID" Height="22" Margin="0,1" Background="#FF333333" Foreground="White" FontSize="10"/>
+                            <Button x:Name="BtnDump" Content="Dump" Height="22" Margin="0,1" Background="#FF333333" Foreground="White" FontSize="10"/>
+                        </UniformGrid>
+                    </GroupBox>
+                </Grid>
 
             </StackPanel>
         </ScrollViewer>
 
         <!-- 右ペイン: ログ + コマンド入力 -->
-        <Grid Grid.Row="0" Grid.RowSpan="2" Grid.Column="2">
+        <Grid Grid.Row="0" Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
@@ -211,15 +234,21 @@ function Disconnect-Serial {
                      BorderBrush="#FF444444" HorizontalScrollBarVisibility="Auto"/>
 
             <!-- 生コマンド入力 -->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
-                <Label Content="CMD:" Foreground="White" VerticalAlignment="Center"/>
-                <TextBox x:Name="CmdInput" Width="500" Background="#FF333333" Foreground="White" BorderBrush="#FF555555"/>
-                <Button x:Name="BtnSend" Content="Send" Width="60" Height="26" Margin="5,0,0,0" Background="#FF2D5F2D" Foreground="White"/>
-                <Button x:Name="BtnClearLog" Content="Clear" Width="60" Height="26" Margin="5,0,0,0" Background="#FF333333" Foreground="White"/>
-            </StackPanel>
+            <Grid Grid.Row="1" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="CMD:" Foreground="White" VerticalAlignment="Center" Padding="0,0,4,0"/>
+                <TextBox Grid.Column="1" x:Name="CmdInput" Background="#FF333333" Foreground="White" BorderBrush="#FF555555" Padding="2,1,2,1"/>
+                <Button Grid.Column="2" x:Name="BtnSend" Content="Send" Width="55" Height="26" Margin="4,0,0,0" Background="#FF2D5F2D" Foreground="White"/>
+                <Button Grid.Column="3" x:Name="BtnClearLog" Content="Clear" Width="55" Height="26" Margin="4,0,0,0" Background="#FF333333" Foreground="White"/>
+            </Grid>
 
             <!-- ステータスバー -->
-            <TextBlock x:Name="BottomStatus" Grid.Row="2" Text="Ready" Foreground="#FF888888" Margin="0,5,0,0"/>
+            <TextBlock x:Name="BottomStatus" Grid.Row="2" Text="Ready" Foreground="#FF888888" Margin="0,4,0,0"/>
         </Grid>
     </Grid>
 </Window>
@@ -231,9 +260,11 @@ function Disconnect-Serial {
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [System.Windows.Markup.XamlReader]::Load($reader)
 
-# コントロール取得
+# コントロール取得 (x: プレフィックスのため XmlNamespaceManager が必要)
+$nsmgr = New-Object System.Xml.XmlNamespaceManager($xaml.NameTable)
+$nsmgr.AddNamespace("x", "http://schemas.microsoft.com/winfx/2006/xaml")
 $controls = @{}
-$xaml.SelectNodes("//*[@x:Name]") | ForEach-Object {
+$xaml.SelectNodes("//*[@x:Name]", $nsmgr) | ForEach-Object {
     $controls[$_.Name] = $window.FindName($_.Name)
 }
 
@@ -327,7 +358,7 @@ for ($i = 0; $i -lt 6; $i++) {
     $num = $i + 1
     $ledButtons[$i].Add_Click({
         param($sender, $e)
-        $n = $sender.Content -replace "LED",""
+        $n = $sender.Content -replace "L",""
         Execute-Command $n
     })
 }
